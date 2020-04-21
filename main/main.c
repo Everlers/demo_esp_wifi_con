@@ -3,15 +3,11 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-//#include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
 #include "esp_event.h"
-//#include "esp_event_loop.h"
-//#include "esp_event_legacy.h"
 #include "nvs_flash.h"
-//#include "esp_spi_flash.h"
 
 #include "lwip/ip4_addr.h"
 
@@ -62,13 +58,12 @@ void wifiStaInit(void)
 	};
 
 	ESP_ERROR_CHECK(esp_netif_init());//初始化TCP/IP协议栈
-	esp_netif_create_default_wifi_sta();//TCP/IP协议栈配置默认
 	ESP_ERROR_CHECK(esp_wifi_init(&cfg));//初始化WiFi
-
-	esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,ESP_EVENT_ANY_ID,&event_handler,NULL,&instance_any_id));//为所有的WiFi事件注册回调
-	ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,IP_EVENT_STA_GOT_IP,&event_handler,NULL,&instance_got_ip));//为获取到IP的事件注册回调
+	ESP_ERROR_CHECK(esp_event_loop_create_default());//创建默认的循环事件
+	esp_netif_create_default_wifi_sta();//TCP/IP协议栈配置默认
+	
+	ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,ESP_EVENT_ANY_ID,&event_handler,NULL,NULL));//为所有的WiFi事件注册回调
+	ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,IP_EVENT_STA_GOT_IP,&event_handler,NULL,NULL));//为获取到IP的事件注册回调
 	
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));//将WiFi信息保存到RAM
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));//配置WiFi模式
@@ -78,7 +73,13 @@ void wifiStaInit(void)
 
 void app_main(void)
 {
-	ESP_ERROR_CHECK(nvs_flash_init());//初始化NVS
+	//Initialize NVS
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
 	wifiStaInit();//初始化WiFi连接
 	lcd_init();//初始化显示
 	while (1)
